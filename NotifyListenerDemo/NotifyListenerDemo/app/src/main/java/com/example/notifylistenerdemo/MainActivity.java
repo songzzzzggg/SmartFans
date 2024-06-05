@@ -18,7 +18,10 @@ import android.content.Context;
 import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Bundle;
+
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationManagerCompat;
+
 import android.content.ComponentName;
 import android.content.Intent;
 
@@ -40,6 +43,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 import static com.example.notifylistenerdemo.NotifyHelper.*;
 
@@ -62,9 +66,8 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
     private static final String TAG = "BLEMain";
 
     //bt_patch(mtu).bin
-    public static final String SERVICE_UUID = "49535343-fe7d-4ae5-8fa9-9fafd205e455";  //蓝牙通讯服务
-    public static final String READ_UUID = "49535343-1e4d-4bd9-ba61-23c647249616";  //读特征
-    public static final String WRITE_UUID = "49535343-8841-43f4-a8d4-ecbe34729bb3";  //写特征
+    public static final String SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";  //蓝牙通讯服务
+    public static final String WRITE_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
 
     //动态申请权限
     private String[] requestPermissionArray = new String[]{
@@ -85,9 +88,9 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
     private static final int CONNECT_FAILURE = 0x02;
     private static final int DISCONNECT_SUCCESS = 0x03;
     private static final int SEND_SUCCESS = 0x04;
-    private static final int SEND_FAILURE= 0x05;
-    private static final int RECEIVE_SUCCESS= 0x06;
-    private static final int RECEIVE_FAILURE =0x07;
+    private static final int SEND_FAILURE = 0x05;
+    private static final int RECEIVE_SUCCESS = 0x06;
+    private static final int RECEIVE_FAILURE = 0x07;
     private static final int START_DISCOVERY = 0x08;
     private static final int STOP_DISCOVERY = 0x09;
     private static final int DISCOVERY_DEVICE = 0x0A;
@@ -95,6 +98,7 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
     private static final int SELECT_DEVICE = 0x0C;
     private static final int BT_OPENED = 0x0D;
     private static final int BT_CLOSED = 0x0E;
+    private static final int SET_TEXT = 0x0F;
 
 //    private LVDevicesAdapter lvDevicesAdapter;
 //    private ListView lvDevices;
@@ -102,7 +106,6 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
 
     private Context mContext;
     private BLEManager bleManager;
-    private BLEBroadcastReceiver bleBroadcastReceiver;
     private BluetoothDevice curBluetoothDevice;  //当前连接的设备
 
     private BluetoothGatt bluetoothGatt;
@@ -112,7 +115,9 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
     //当前设备连接状态
     private boolean curConnState = false;
 
-    private String BLEGattServerAddress = "cc:7b:5c:1e:17:3e";
+    private String BLEGattServerAddress = "CC:7B:5C:1E:17:3E";
+
+    BluetoothGattCharacteristic characteristic;
 
     private BluetoothLeScanner bluetoothLeScanner;
     private boolean scanning;
@@ -120,6 +125,8 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
 
     // Stops scanning after 10 seconds.
     private static final long SCAN_PERIOD = 10000;
+
+    private TextView tvBLEState;
 
     private void scanLeDevice() {
         if (!scanning) {
@@ -140,8 +147,6 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
         }
     }
 
-//    private LeDeviceListAdapter leDeviceListAdapter = new LeDeviceListAdapter();
-
     // Device scan callback.
     private ScanCallback leScanCallback =
             new ScanCallback() {
@@ -157,13 +162,13 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
 
 
     @SuppressLint("HandlerLeak")
-    private Handler mHandler = new Handler(){
+    private Handler mHandler = new Handler() {
         @SuppressLint("SetTextI18n")
         @Override
         public void handleMessage(@NonNull Message msg) {
             super.handleMessage(msg);
 
-            switch(msg.what){
+            switch (msg.what) {
                 case START_DISCOVERY:
                     Log.d(TAG, "开始搜索设备...");
                     break;
@@ -232,9 +237,11 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
                 case BT_CLOSED:
                     Log.d(TAG, "系统蓝牙已关闭");
                     break;
-
                 case BT_OPENED:
                     Log.d(TAG, "系统蓝牙已打开");
+                    break;
+                case SET_TEXT:
+                    tvBLEState.setText(msg.obj.toString());
                     break;
             }
 
@@ -246,12 +253,13 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         requestPermission();
-        textView = findViewById(R.id.textView);
+        mContext = this;
+        // 初始化视图
+        initView();
         NotifyHelper.getInstance().setNotifyListener(this);
 
         // 检查蓝牙是否可用
-        if(!checkBLE())
-        {
+        if (!checkBLE()) {
             Toast.makeText(this, "该设备不支持低功耗蓝牙", Toast.LENGTH_SHORT).show();
         }
         //初始化权限
@@ -259,24 +267,78 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
         // 启用蓝牙
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         bluetoothLeScanner = bluetoothAdapter.getBluetoothLeScanner();
-//        scanLeDevice();
-        bluetoothDevice = bluetoothAdapter.getRemoteDevice(BLEGattServerAddress);
+        scanLeDevice();
+        try {
+            if (BluetoothAdapter.checkBluetoothAddress(BLEGattServerAddress)) {
+                //It is a valid MAC address.
+                bluetoothDevice = bluetoothAdapter.getRemoteDevice(BLEGattServerAddress);
+//                btSocket = createBluetoothSocket(device);
+            } else {
+
+                Toast.makeText(mContext, "Invalid MAC: Address", Toast.LENGTH_LONG).show();
+            }
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            e.printStackTrace();
+        }
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
         bluetoothGatt = bluetoothDevice.connectGatt(this, true, gattCallback);
     }
+
     private BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             if (newState == BluetoothGatt.STATE_CONNECTED) {
-                Log.d(TAG, "Connected to GATT server.");
-                Log.d(TAG, "Attempting to start service discovery:" +
-                        bluetoothGatt.discoverServices());
+                if (ActivityCompat.checkSelfPermission(mContext, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    return;
+                }
+                gatt.discoverServices();
+                mHandler.obtainMessage(SET_TEXT, "蓝牙连接成功").sendToTarget();
             } else if (newState == BluetoothGatt.STATE_DISCONNECTED) {
-                Log.d(TAG, "Disconnected from GATT server.");
+                mHandler.obtainMessage(SET_TEXT, "蓝牙连接断开").sendToTarget();
+            }
+        }
+
+        @Override
+        public void onServicesDiscovered(BluetoothGatt gatt, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                // get the service
+                characteristic = gatt.getService(UUID.fromString(SERVICE_UUID)).getCharacteristic(UUID.fromString(WRITE_UUID));
+                characteristic.setValue("1");
+                if (ActivityCompat.checkSelfPermission(mContext, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    return;
+                }
+                bluetoothGatt.writeCharacteristic(characteristic);
+            } else {
+                mHandler.obtainMessage(SET_TEXT, "服务未发现").sendToTarget();
+            }
+        }
+
+        @Override
+        public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+//                tvBLEState.setText("发送成功");
+            } else {
+//                tvBLEState.setText("发送失败");
+            }
+        }
+
+        @Override
+        public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                tvBLEState.setText("接收成功");
+            } else {
+                tvBLEState.setText("接收失败");
             }
         }
     };
 
 
+    /**
+     * 检查蓝牙是否可用
+     * @return
+     */
     private boolean checkBLE() {
         // Use this check to determine whether Bluetooth classic is supported on the device.
 // Then you can selectively disable BLE-related features.
@@ -285,9 +347,9 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
 // Use this check to determine whether BLE is supported on the device. Then
 // you can selectively disable BLE-related features.
         boolean bluetoothLEAvailable = getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
-        if(bluetoothAvailable && bluetoothLEAvailable){
+        if (bluetoothAvailable && bluetoothLEAvailable) {
             return true;
-        }else{
+        } else {
             return false;
         }
     }
@@ -377,21 +439,30 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
             case N_MESSAGE:
                 textView.setText("收到短信消息");
                 //震动一下，通过蓝牙传递一个特征值，表名这是消息
+                characteristic.setValue("1");
                 break;
             case N_CALL:
                 textView.setText("收到来电消息");
+                //震动一下，通过蓝牙传递一个特征值，表名这是电话
+                characteristic.setValue("0");
                 break;
             case N_WX:
                 textView.setText("收到微信消息");
+                characteristic.setValue("1");
                 break;
             case N_QQ:
                 textView.setText("收到QQ消息");
+                characteristic.setValue("1");
 //                this.isInformation=true;
                 //将this.isInformation通过某种渠道传递给蓝牙
                 break;
             default:
                 break;
         }
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+        bluetoothGatt.writeCharacteristic(characteristic);
     }
 
     /**
@@ -451,85 +522,12 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
     }
 
 
-
     /**
      * 初始化视图
      */
     private void initView() {
-//        btSearch = findViewById(R.id.bt_search);
-//        tvCurConState = findViewById(R.id.tv_cur_con_state);
-//        btConnect = findViewById(R.id.bt_connect);
-//        btDisconnect = findViewById(R.id.bt_disconnect);
-//        tvName = findViewById(R.id.tv_name);
-//        tvAddress = findViewById(R.id.tv_address);
-//        etSendMsg = findViewById(R.id.et_send_msg);
-//        btSend = findViewById(R.id.bt_to_send);
-//        tvSendResult = findViewById(R.id.tv_send_result);
-//        tvReceive = findViewById(R.id.tv_receive_result);
-//        llDeviceList = findViewById(R.id.ll_device_list);
-//        llDataSendReceive  = findViewById(R.id.ll_data_send_receive);
-//        lvDevices = findViewById(R.id.lv_devices);
-    }
-
-
-    /**
-     * 初始化监听
-     */
-    private void iniListener() {
-//        btSearch.setOnClickListener(this);
-//        btConnect.setOnClickListener(this);
-//        btDisconnect.setOnClickListener(this);
-//        btSend.setOnClickListener(this);
-//
-//        lvDevices.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-//            @Override
-//            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-//                BLEDevice bleDevice = (BLEDevice) lvDevicesAdapter.getItem(i);
-//                BluetoothDevice bluetoothDevice = bleDevice.getBluetoothDevice();
-//                if(bleManager != null){
-//                    bleManager.stopDiscoveryDevice();
-//                }
-//                Message message = new Message();
-//                message.what = SELECT_DEVICE;
-//                message.obj = bluetoothDevice;
-//                mHandler.sendMessage(message);
-//            }
-//        });
-    }
-
-    /**
-     * 初始化数据
-     */
-    private void initData() {
-        //列表适配器
-//        lvDevicesAdapter = new LVDevicesAdapter(MainActivity.this);
-//        lvDevices.setAdapter(lvDevicesAdapter);
-
-        //初始化ble管理器
-        bleManager = new BLEManager();
-        if(!bleManager.initBle(mContext)) {
-            Log.d(TAG, "该设备不支持低功耗蓝牙");
-            Toast.makeText(mContext, "该设备不支持低功耗蓝牙", Toast.LENGTH_SHORT).show();
-        }else{
-            if(!bleManager.isEnable()){
-                //去打开蓝牙
-                bleManager.openBluetooth(mContext,true);
-            }
-        }
-    }
-
-
-    /**
-     * 注册广播
-     */
-    private void initBLEBroadcastReceiver() {
-        //注册广播接收
-        bleBroadcastReceiver = new BLEBroadcastReceiver();
-        IntentFilter intentFilter = new IntentFilter();
-        intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED); //开始扫描
-        intentFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);//扫描结束
-        intentFilter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);//手机蓝牙状态监听
-        registerReceiver(bleBroadcastReceiver,intentFilter);
+        tvBLEState = findViewById(R.id.tvBLEState);
+        textView = findViewById(R.id.textView);
     }
 
     /**
@@ -537,12 +535,12 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
      */
     private void initPermissions() {
         //Android 6.0以上动态申请权限
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             final PermissionRequest permissionRequest = new PermissionRequest();
             permissionRequest.requestRuntimePermission(MainActivity.this, requestPermissionArray, new PermissionListener() {
                 @Override
                 public void onGranted() {
-                    Log.d(TAG,"所有权限已被授予");
+                    Log.d(TAG, "所有权限已被授予");
                 }
 
                 //用户勾选“不再提醒”拒绝权限后，关闭程序再打开程序只进入该方法！
@@ -550,7 +548,7 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
                 public void onDenied(List<String> deniedPermissions) {
                     deniedPermissionList = deniedPermissions;
                     for (String deniedPermission : deniedPermissionList) {
-                        Log.e(TAG,"被拒绝权限：" + deniedPermission);
+                        Log.e(TAG, "被拒绝权限：" + deniedPermission);
                     }
                 }
             });
@@ -560,224 +558,21 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-
-        //注销广播接收
-        unregisterReceiver(bleBroadcastReceiver);
     }
 
     @Override
     public void onClick(View view) {
-//        switch (view.getId()) {
-//            case R.id.bt_search:  //搜索蓝牙
-//                llDataSendReceive.setVisibility(View.GONE);
-//                llDeviceList.setVisibility(View.VISIBLE);
-//                searchBtDevice();
-//                break;
-//
-//            case R.id.bt_connect: //连接蓝牙
-//                if(!curConnState) {
-//                    if(bleManager != null){
-//                        bleManager.connectBleDevice(mContext,curBluetoothDevice,15000,SERVICE_UUID,READ_UUID,WRITE_UUID,onBleConnectListener);
-//                    }
-//                }else{
-//                    Toast.makeText(this, "当前设备已连接", Toast.LENGTH_SHORT).show();
-//                }
-//                break;
-//
-//            case R.id.bt_disconnect: //断开连接
-//                if(curConnState) {
-//                    if(bleManager != null){
-//                        bleManager.disConnectDevice();
-//                    }
-//                }else{
-//                    Toast.makeText(this, "当前设备未连接", Toast.LENGTH_SHORT).show();
-//                }
-//                break;
-//
-//            case R.id.bt_to_send: //发送数据
-//                if(curConnState){
-//                    String sendMsg = etSendMsg.getText().toString();
-//                    if(sendMsg.isEmpty()){
-//                        Toast.makeText(this, "发送数据为空！", Toast.LENGTH_SHORT).show();
-//                        return;
-//                    }
-//                    if(bleManager != null) {
-//                        bleManager.sendMessage(sendMsg);  //以16进制字符串形式发送数据
-//                    }
-//                }else{
-//                    Toast.makeText(this, "请先连接当前设备", Toast.LENGTH_SHORT).show();
-//                }
-//                break;
-//        }
-
-    }
-
-    //////////////////////////////////  搜索设备  /////////////////////////////////////////////////
-    private void searchBtDevice() {
-        if(bleManager == null){
-            Log.d(TAG, "searchBtDevice()-->bleManager == null");
-            return;
-        }
-
-        if (bleManager.isDiscovery()) { //当前正在搜索设备...
-            bleManager.stopDiscoveryDevice();
-        }
-
-//        if(lvDevicesAdapter != null){
-//            lvDevicesAdapter.clear();  //清空列表
-//        }
-
-        //开始搜索
-        bleManager.startDiscoveryDevice(onDeviceSearchListener,15000);
-    }
-
-    //扫描结果回调
-    private OnDeviceSearchListener onDeviceSearchListener = new OnDeviceSearchListener() {
-
-        @Override
-        public void onDeviceFound(BLEDevice bleDevice) {
-            Message message = new Message();
-            message.what = DISCOVERY_DEVICE;
-            message.obj = bleDevice;
-            mHandler.sendMessage(message);
-        }
-
-        @Override
-        public void onDiscoveryOutTime() {
-            Message message = new Message();
-            message.what = DISCOVERY_OUT_TIME;
-            mHandler.sendMessage(message);
-        }
-    };
-
-    //连接回调
-    private OnBleConnectListener onBleConnectListener = new OnBleConnectListener() {
-        @Override
-        public void onConnecting(BluetoothGatt bluetoothGatt, BluetoothDevice bluetoothDevice) {
-
-        }
-
-        @Override
-        public void onConnectSuccess(BluetoothGatt bluetoothGatt, BluetoothDevice bluetoothDevice, int status) {
-            //因为服务发现成功之后，才能通讯，所以在成功发现服务的地方表示连接成功
-        }
-
-        @Override
-        public void onConnectFailure(BluetoothGatt bluetoothGatt, BluetoothDevice bluetoothDevice, String exception, int status) {
-            Message message = new Message();
-            message.what = CONNECT_FAILURE;
-            mHandler.sendMessage(message);
-        }
-
-        @Override
-        public void onDisConnecting(BluetoothGatt bluetoothGatt, BluetoothDevice bluetoothDevice) {
-
-        }
-
-        @Override
-        public void onDisConnectSuccess(BluetoothGatt bluetoothGatt, BluetoothDevice bluetoothDevice, int status) {
-            Message message = new Message();
-            message.what = DISCONNECT_SUCCESS;
-            message.obj = status;
-            mHandler.sendMessage(message);
-        }
-
-        @Override
-        public void onServiceDiscoverySucceed(BluetoothGatt bluetoothGatt, BluetoothDevice bluetoothDevice, int status) {
-            //因为服务发现成功之后，才能通讯，所以在成功发现服务的地方表示连接成功
-            Message message = new Message();
-            message.what = CONNECT_SUCCESS;
-            mHandler.sendMessage(message);
-        }
-
-        @Override
-        public void onServiceDiscoveryFailed(BluetoothGatt bluetoothGatt, BluetoothDevice bluetoothDevice, String failMsg) {
-            Message message = new Message();
-            message.what = CONNECT_FAILURE;
-            mHandler.sendMessage(message);
-        }
-
-        @Override
-        public void onReceiveMessage(BluetoothGatt bluetoothGatt, BluetoothDevice bluetoothDevice, BluetoothGattCharacteristic characteristic, byte[] msg) {
-            Message message = new Message();
-            message.what = RECEIVE_SUCCESS;
-            message.obj = msg;
-            mHandler.sendMessage(message);
-        }
-
-        @Override
-        public void onReceiveError(String errorMsg) {
-            Message message = new Message();
-            message.what = RECEIVE_FAILURE;
-            mHandler.sendMessage(message);
-        }
-
-        @Override
-        public void onWriteSuccess(BluetoothGatt bluetoothGatt, BluetoothDevice bluetoothDevice, byte[] msg) {
-            Message message = new Message();
-            message.what = SEND_SUCCESS;
-            message.obj = msg;
-            mHandler.sendMessage(message);
-        }
-
-        @Override
-        public void onWriteFailure(BluetoothGatt bluetoothGatt, BluetoothDevice bluetoothDevice, byte[] msg, String errorMsg) {
-            Message message = new Message();
-            message.what = SEND_FAILURE;
-            message.obj = msg;
-            mHandler.sendMessage(message);
-        }
-
-        @Override
-        public void onReadRssi(BluetoothGatt bluetoothGatt, int Rssi, int status) {
-
-        }
-
-        @Override
-        public void onMTUSetSuccess(String successMTU, int newMtu) {
-
-        }
-
-        @Override
-        public void onMTUSetFailure(String failMTU) {
-
-        }
-    };
-
-
-    /**
-     * 蓝牙广播接收器
-     */
-    private class BLEBroadcastReceiver extends BroadcastReceiver {
-
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            if (TextUtils.equals(action, BluetoothAdapter.ACTION_DISCOVERY_STARTED)) { //开启搜索
-                Message message = new Message();
-                message.what = START_DISCOVERY;
-                mHandler.sendMessage(message);
-
-            } else if (TextUtils.equals(action, BluetoothAdapter.ACTION_DISCOVERY_FINISHED)) {//完成搜素
-                Message message = new Message();
-                message.what = STOP_DISCOVERY;
-                mHandler.sendMessage(message);
-
-            } else if(TextUtils.equals(action,BluetoothAdapter.ACTION_STATE_CHANGED)){   //系统蓝牙状态监听
-
-                int state = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE,0);
-                if(state == BluetoothAdapter.STATE_OFF){
-                    Message message = new Message();
-                    message.what = BT_CLOSED;
-                    mHandler.sendMessage(message);
-
-                }else if(state == BluetoothAdapter.STATE_ON){
-                    Message message = new Message();
-                    message.what = BT_OPENED;
-                    mHandler.sendMessage(message);
-
+        switch (view.getId()) {
+            case R.id.btnConnBLE:
+                if (bluetoothGatt != null) {
+                    if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                        return;
+                    }
+                    bluetoothDevice.connectGatt(this, true, gattCallback);
                 }
-            }
+                break;
+            default:
+                break;
         }
     }
 }
