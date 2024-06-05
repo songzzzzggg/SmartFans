@@ -305,11 +305,6 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 // get the service
                 characteristic = gatt.getService(UUID.fromString(SERVICE_UUID)).getCharacteristic(UUID.fromString(WRITE_UUID));
-                characteristic.setValue("1");
-                if (ActivityCompat.checkSelfPermission(mContext, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                    return;
-                }
-                bluetoothGatt.writeCharacteristic(characteristic);
             } else {
                 mHandler.obtainMessage(SET_TEXT, "服务未发现").sendToTarget();
             }
@@ -327,9 +322,9 @@ public class MainActivity extends AppCompatActivity implements NotifyListener {
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
-                tvBLEState.setText("接收成功");
+//                tvBLEState.setText("接收成功");
             } else {
-                tvBLEState.setText("接收失败");
+//                tvBLEState.setText("接收失败");
             }
         }
     };
