@@ -1,3 +1,6 @@
 <resources>
-    <string name="app_name">获取实时通知</string>
+    <string name="app_name">智能风扇</string>
+    <string name="hint_top">请输入温度上限</string>
+    <string name="hint_bottom">请输入温度下限</string>
+
 </resources>
