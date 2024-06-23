@@ -359,15 +359,4 @@ public class MainActivity extends AppCompatActivity{
 
 
 
-    public void onClickFanControl(View view) {
-        //点击风扇控制按钮实现跳转
-        startActivity(new Intent(MainActivity.this,FanControlActivity.class));
-        finish();
-    }
-
-    public void onClickTemControl(View view) {
-        //点击温度控制按钮实现跳转
-        startActivity(new Intent(MainActivity.this, TemControlActivity.class));
-        finish();
-    }
 }

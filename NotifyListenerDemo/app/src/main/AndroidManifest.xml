@@ -20,12 +20,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".FanControlActivity"
-            android:label="风扇控制"></activity>
-        <activity
-            android:name=".TemControlActivity"
-            android:label="温度控制"></activity>
+
 
     </application>
     <!-- 蓝牙权限 -->
