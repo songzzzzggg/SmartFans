@@ -22,10 +22,12 @@ public class TemControlActivity extends AppCompatActivity {
     public void onClickFanControl(View view) {
         //点击温度控制按钮实现跳转
         startActivity(new Intent(TemControlActivity.this, FanControlActivity.class));
+        finish();
     }
 
     public void onClickFanStatus(View view) {
         //点击风扇状态按钮实现跳转
         startActivity(new Intent(TemControlActivity.this, MainActivity.class));
+        finish();
     }
 }

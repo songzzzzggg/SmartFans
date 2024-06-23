@@ -235,6 +235,7 @@ public class MainActivity extends AppCompatActivity{
         if (!checkBLE()) {
             Toast.makeText(this, "该设备不支持低功耗蓝牙", Toast.LENGTH_SHORT).show();
         }
+
         //初始化权限
         initPermissions();
         // 启用蓝牙
@@ -361,10 +362,12 @@ public class MainActivity extends AppCompatActivity{
     public void onClickFanControl(View view) {
         //点击风扇控制按钮实现跳转
         startActivity(new Intent(MainActivity.this,FanControlActivity.class));
+        finish();
     }
 
     public void onClickTemControl(View view) {
         //点击温度控制按钮实现跳转
         startActivity(new Intent(MainActivity.this, TemControlActivity.class));
+        finish();
     }
 }

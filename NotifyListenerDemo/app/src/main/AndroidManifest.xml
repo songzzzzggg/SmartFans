@@ -26,17 +26,6 @@
         <activity
             android:name=".TemControlActivity"
             android:label="温度控制"></activity>
-        <!--通知监听服务-->
-        <service
-            android:name=".NotifyService"
-            android:enabled="true"
-            android:label="测试通知服务"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
 
     </application>
     <!-- 蓝牙权限 -->
