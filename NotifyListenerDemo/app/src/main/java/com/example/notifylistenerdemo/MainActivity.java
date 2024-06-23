@@ -17,8 +17,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -229,6 +233,14 @@ public class MainActivity extends AppCompatActivity{
         setContentView(R.layout.activity_main);
         mContext = this;
         // 初始化视图
+        final EditText editText = findViewById(R.id.input_password);
+        Button button = findViewById(R.id.button);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(MainActivity.this, editText.getText(), Toast.LENGTH_SHORT).show();
+            }
+        });
         initView();
 
         // 检查蓝牙是否可用
@@ -258,7 +270,12 @@ public class MainActivity extends AppCompatActivity{
             return;
         }
         bluetoothGatt = bluetoothDevice.connectGatt(this, true, gattCallback);
+
+
+
+
     }
+
 
     private BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
         @Override
@@ -356,6 +373,7 @@ public class MainActivity extends AppCompatActivity{
             });
         }
     }
+
 
 
 
